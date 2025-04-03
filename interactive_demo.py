@@ -68,32 +68,31 @@ if __name__ == '__main__':
     config['enable_long_term'] = True
     config['enable_long_term_count_usage'] = True
 
-    device = 'cuda' if torch.cuda.is_available() else 'cpu'
-    with torch.cuda.amp.autocast(enabled=not args.no_amp):
+    device = 'cpu'
 
-        # Load our checkpoint
-        network = XMem(config, args.model, pretrained_key_encoder=False, pretrained_value_encoder=False).to(device).eval()
+    # Load our checkpoint
+    network = XMem(config, args.model, pretrained_key_encoder=False, pretrained_value_encoder=False).to(device).eval()
 
-        # Loads the S2M model
-        if args.s2m_model is not None:
-            s2m_saved = torch.load(args.s2m_model)
-            s2m_model = S2M().to(device).eval()
-            s2m_model.load_state_dict(s2m_saved)
-        else:
-            s2m_model = None
+    # Loads the S2M model
+    if args.s2m_model is not None:
+        s2m_saved = torch.load(args.s2m_model, map_location='cpu')
+        s2m_model = S2M().to(device).eval()
+        s2m_model.load_state_dict(s2m_saved)
+    else:
+        s2m_model = None
 
-        # Manages most IO
-        config['num_objects_default_value'] = 1
-        resource_manager = ResourceManager(config)
-        num_objects = resource_manager.num_objects
-        config['num_objects'] = num_objects
+    # Manages most IO
+    config['num_objects_default_value'] = 1
+    resource_manager = ResourceManager(config)
+    num_objects = resource_manager.num_objects
+    config['num_objects'] = num_objects
 
-        s2m_controller = S2MController(s2m_model, num_objects, ignore_class=255)
-        if args.fbrs_model is not None:
-            fbrs_controller = FBRSController(args.fbrs_model)
-        else:
-            fbrs_controller = None
+    s2m_controller = S2MController(s2m_model, num_objects, ignore_class=255)
+    if args.fbrs_model is not None:
+        fbrs_controller = FBRSController(args.fbrs_model)
+    else:
+        fbrs_controller = None
 
-        app = QApplication(sys.argv)
-        ex = App(network, resource_manager, s2m_controller, fbrs_controller, config)
-        sys.exit(app.exec_())
+    app = QApplication(sys.argv)
+    ex = App(network, resource_manager, s2m_controller, fbrs_controller, config)
+    sys.exit(app.exec_())

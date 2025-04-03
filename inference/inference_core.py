@@ -23,7 +23,7 @@ class InferenceCore:
         self.all_labels = None
 
         # warmup
-        self.network.encode_key(torch.zeros((1, 3, 480, 854), device='cuda:0'))
+        self.network.encode_key(torch.zeros((1, 3, 480, 854), device='cpu'))
 
     def clear_memory(self, keep_permanent=False):
         self.curr_ti = -1

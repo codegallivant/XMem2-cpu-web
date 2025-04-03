@@ -4,7 +4,7 @@ from .fbrs.inference import utils
 
 
 class FBRSController:
-    def __init__(self, checkpoint_path, device='cuda:0', max_size=800):
+    def __init__(self, checkpoint_path, device='cpu', max_size=800):
         model = utils.load_is_model(checkpoint_path, device, cpu_dist_maps=True, norm_radius=260)
 
         # Predictor params

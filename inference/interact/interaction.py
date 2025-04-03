@@ -80,7 +80,7 @@ class FreeInteraction(Interaction):
 
         self.size = None
         
-        self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
+        self.device = 'cpu'
 
     def set_size(self, size):
         self.size = size

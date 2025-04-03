@@ -176,7 +176,7 @@ def run_multiple_frame_selectors(videos_info: Dict[str, Dict], csv_output_path: 
                 )
                 exceptions.append([video_name, method_name, str(e)])
 
-            torch.cuda.empty_cache()
+            # torch.cuda.empty_cache()
             results[method_name] = json.dumps(chosen_annotation_frames)
             p_bar.update()
 

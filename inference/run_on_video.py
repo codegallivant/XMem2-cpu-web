@@ -39,7 +39,7 @@ def _inference_on_video(frames_with_masks, imgs_in_path, masks_in_path, masks_ou
                         object_color_if_single_object=(255, 255, 255), 
                         print_fps=False,
                         image_saving_max_queue_size=200):
-    device = 'cuda' if torch.cuda.is_available() else 'cpu'
+    device = 'cpu'
     
     torch.autograd.set_grad_enabled(False)
     frames_with_masks = set(frames_with_masks)
@@ -150,7 +150,7 @@ def _load_main_objects(imgs_in_path, masks_in_path, config):
     model_path = config['model']
     network = XMem(config, model_path, pretrained_key_encoder=False, pretrained_value_encoder=False).to(device).eval()
     if model_path is not None:
-        model_weights = torch.load(model_path)
+        model_weights = torch.load(model_path, map_location='cpu')
         network.load_weights(model_weights, init_as_zero_if_needed=True)
     else:
         warn('No model weights were loaded, as config["model"] was not specified.')

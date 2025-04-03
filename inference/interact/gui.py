@@ -64,7 +64,7 @@ class App(QWidget):
         self.res_man = resource_manager
         self.threadpool = QThreadPool()
         self.last_opened_directory = str(Path.home())
-        self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
+        self.device = 'cpu'
 
         self.num_frames = len(self.res_man)
         self.height, self.width = self.res_man.h, self.res_man.w

@@ -7,7 +7,7 @@ import torch.nn.functional as F
 from util.palette import davis_palette
 from dataset.range_transform import im_normalization
 
-def image_to_torch(frame: np.ndarray, device='cuda'):
+def image_to_torch(frame: np.ndarray, device='cpu'):
     # frame: H*W*3 numpy array
     frame = frame.transpose(2, 0, 1)
     frame = torch.from_numpy(frame).float().to(device)/255

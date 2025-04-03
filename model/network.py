@@ -15,13 +15,14 @@ from model.memory_util import *
 
 
 class XMem(nn.Module):
-    def __init__(self, config, model_path=None, map_location=None, pretrained_key_encoder=True, pretrained_value_encoder=True):
+    def __init__(self, config, model_path=None, map_location='cpu', pretrained_key_encoder=True, pretrained_value_encoder=True):
+        map_location = 'cpu'
         """
         model_path/map_location are used in evaluation only
         map_location is for converting models saved in cuda to cpu
         """
         super().__init__()
-        model_weights = self.init_hyperparameters(config, model_path, map_location)
+        model_weights = self.init_hyperparameters(config, model_path, 'cpu')
 
         self.single_object = config.get('single_object', False)
         print(f'Single object mode: {self.single_object}')
@@ -142,7 +143,7 @@ class XMem(nn.Module):
         if model_path is not None:
             # load the model and key/value/hidden dimensions with some hacks
             # config is updated with the loaded parameters
-            model_weights = torch.load(model_path, map_location=map_location)
+            model_weights = torch.load(model_path, map_location='cpu')
             self.key_dim = model_weights['key_proj.key_proj.weight'].shape[0]
             self.value_dim = model_weights['value_encoder.fuser.block2.conv2.weight'].shape[0]
             self.disable_hidden = 'decoder.hidden_update.transform.weight' not in model_weights
