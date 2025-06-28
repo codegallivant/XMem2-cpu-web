@@ -1,0 +1,648 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Examine Video</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f8f9fa;
+            margin: 0;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1200px;
+            margin: auto;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0px 0px 10px rgba(0, 0, 0, 0.1);
+        }
+        h2 { color: #333; text-align: center; }
+        .video-container {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 20px;
+        }
+        .frame-container, .mask-container {
+            width: 48%;
+            text-align: center;
+        }
+        img {
+            max-width: 100%;
+            border: 1px solid #ddd;
+        }
+        .controls {
+            display: flex;
+            justify-content: center;
+            margin: 20px 0;
+        }
+        button {
+            margin: 0 5px;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            background-color: #007bff;
+            color: white;
+        }
+        button:disabled {
+            background-color: #cccccc;
+        }
+        .edit-container {
+            margin-top: 20px;
+            border-top: 1px solid #ddd;
+            padding-top: 20px;
+        }
+        canvas {
+            border: 1px solid #ddd;
+            margin: auto;
+            display: block;
+        }
+        #frameInfo {
+            text-align: center;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+        .btn-success {
+            background-color: #28a745;
+        }
+        .btn-warning {
+            background-color: #ffc107;
+            color: black;
+        }
+        .btn-danger {
+            background-color: #dc3545;
+        }
+        .btn-secondary {
+            background-color: #6c757d;
+        }
+        .btn-info {
+            background-color: #17a2b8;
+        }
+        .home-btn {
+            display: block;
+            margin: 20px auto;
+            width: 150px;
+        }
+        /* Loading spinner styles */
+        .loading-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100%;
+            width: 100%;
+        }
+        .spinner {
+            border: 5px solid #f3f3f3;
+            border-top: 5px solid #007bff;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .mask-image-container {
+            position: relative;
+            min-height: 200px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>Examine Video</h2>
+        
+        <div id="frameInfo">Frame: 0 / {{ total_frames }}</div>
+        
+        <div class="video-container">
+            <div class="frame-container">
+                <h3>Current Frame</h3>
+                <img id="currentFrame" src="" alt="Current Frame">
+            </div>
+            <div class="mask-container">
+                <h3>Inferred Mask</h3>
+                <div class="mask-image-container">
+                    <div id="loadingSpinner" class="loading-container">
+                        <div class="spinner"></div>
+                    </div>
+                    <img id="currentMask" src="" alt="Inferred Mask" style="display: none;">
+                </div>
+            </div>
+        </div>
+        
+        <div class="controls">
+            <button id="prevFrameBtn" class="btn-secondary" disabled>Previous</button>
+            <button id="nextFrameBtn" class="btn-primary">Next</button>
+            <button id="editMaskBtn" class="btn-warning">Edit Mask</button>
+        </div>
+        
+        <div id="editContainer" class="edit-container" style="display: none;">
+            <h3>Edit Mask</h3>
+<!-- Add this button to the Edit Mask section -->
+<div style="text-align: center; margin-bottom: 10px;">
+    <button id="newShapeBtn" class="btn-info">New Shape</button>
+    <button id="addPointBtn" class="btn-info">Add Point</button>
+    <button id="removePointBtn" class="btn-danger">Remove Point</button>
+    <button id="saveChangesBtn" class="btn-success">Save Changes</button>
+    <button id="cancelEditBtn" class="btn-secondary">Cancel</button>
+</div>
+            <canvas id="editCanvas" width="{{ width }}" height="{{ height }}"></canvas>
+        </div>
+        
+        <a href="/" class="home-btn"><button class="btn-secondary">Back to Home</button></a>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const totalFrames = {{ total_frames }};
+            let currentFrame = 0;
+            let pointsData = null;
+            let selectedPoint = null;
+            let selectedShape = null;
+            let isAddingPoint = false;
+            let isRemovingPoint = false;
+            let canvas = document.getElementById('editCanvas');
+            let ctx = canvas.getContext('2d');
+            
+            // Set up UI elements
+            const prevBtn = document.getElementById('prevFrameBtn');
+            const nextBtn = document.getElementById('nextFrameBtn');
+            const editBtn = document.getElementById('editMaskBtn');
+            const frameInfo = document.getElementById('frameInfo');
+            const frameImg = document.getElementById('currentFrame');
+            const maskImg = document.getElementById('currentMask');
+            const loadingSpinner = document.getElementById('loadingSpinner');
+            const editContainer = document.getElementById('editContainer');
+            const addPointBtn = document.getElementById('addPointBtn');
+            const removePointBtn = document.getElementById('removePointBtn');
+            const saveChangesBtn = document.getElementById('saveChangesBtn');
+            const cancelEditBtn = document.getElementById('cancelEditBtn');
+            
+            // Load initial frame
+            loadFrame(currentFrame);
+            
+            // Event listeners
+            prevBtn.addEventListener('click', () => {
+                if (currentFrame > 0) {
+                    currentFrame--;
+                    loadFrame(currentFrame);
+                }
+            });
+            
+            nextBtn.addEventListener('click', () => {
+                if (currentFrame < totalFrames - 1) {
+                    currentFrame++;
+                    loadFrame(currentFrame);
+                }
+            });
+            
+            editBtn.addEventListener('click', () => {
+                enterEditMode();
+            });
+            
+            addPointBtn.addEventListener('click', () => {
+                isAddingPoint = true;
+                isRemovingPoint = false;
+                addPointBtn.classList.add('btn-success');
+                removePointBtn.classList.remove('btn-success');
+            });
+            
+            removePointBtn.addEventListener('click', () => {
+                isAddingPoint = false;
+                isRemovingPoint = true;
+                addPointBtn.classList.remove('btn-success');
+                removePointBtn.classList.add('btn-success');
+            });
+            
+            saveChangesBtn.addEventListener('click', () => {
+                saveEditedMask();
+            });
+            
+            cancelEditBtn.addEventListener('click', () => {
+                exitEditMode();
+            });
+            
+            canvas.addEventListener('click', (e) => {
+                const rect = canvas.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
+                
+                if (isAddingPoint && selectedShape !== null) {
+                    addPoint(x, y);
+                } else if (isRemovingPoint) {
+                    removePoint(x, y);
+                } else {
+                    selectPoint(x, y);
+                }
+            });
+            
+            canvas.addEventListener('mousemove', (e) => {
+                if (selectedPoint !== null && !isAddingPoint && !isRemovingPoint) {
+                    const rect = canvas.getBoundingClientRect();
+                    const x = e.clientX - rect.left;
+                    const y = e.clientY - rect.top;
+                    
+                    pointsData.shapes[selectedShape].points[selectedPoint] = [Math.round(x), Math.round(y)];
+                    drawCanvas();
+                }
+            });
+            
+            // Functions
+            function loadFrame(frameNum) {
+                frameInfo.textContent = `Frame: ${frameNum} / ${totalFrames - 1}`;
+                prevBtn.disabled = frameNum === 0;
+                nextBtn.disabled = frameNum === totalFrames - 1;
+                
+                // Load frame image
+                frameImg.src = `/get_frame/${frameNum}?t=${Date.now()}`;
+                
+                // Show loading spinner and hide mask image
+                loadingSpinner.style.display = 'flex';
+                maskImg.style.display = 'none';
+                
+                // Load or generate mask
+                fetch(`/infer_frame/${frameNum}?t=${Date.now()}`)
+                    .then(response => {
+                        if (!response.ok) throw new Error('Failed to load mask');
+                        return response.blob();
+                    })
+                    .then(blob => {
+                        const url = URL.createObjectURL(blob);
+                        maskImg.onload = function() {
+                            // Hide spinner and show mask when image is loaded
+                            loadingSpinner.style.display = 'none';
+                            maskImg.style.display = 'block';
+                        };
+                        maskImg.src = url;
+                    })
+                    .catch(error => {
+                        console.error('Error loading mask:', error);
+                        loadingSpinner.style.display = 'none';
+                        maskImg.style.display = 'block';
+                        maskImg.src = "";
+                    });
+            }
+            
+// Fix for examine.html - Update the loadImageToCanvas and enterEditMode functions
+
+function enterEditMode() {
+    fetch(`/get_mask_points/${currentFrame}`)
+        .then(response => {
+            if (!response.ok) throw new Error('Failed to get mask points');
+            return response.json();
+        })
+        .then(data => {
+            console.log("Received points data:", data); // Debug log
+            pointsData = data;
+            editContainer.style.display = 'block';
+            loadImageToCanvas();
+            
+            // Set initial state for editing tools
+            isAddingPoint = false;
+            isRemovingPoint = false;
+            addPointBtn.classList.remove('btn-success');
+            removePointBtn.classList.remove('btn-success');
+        })
+        .catch(error => {
+            console.error('Error getting mask points:', error);
+            alert('Failed to get mask points for editing');
+        });
+}
+
+function loadImageToCanvas() {
+    const img = new Image();
+    img.src = frameImg.src;
+    img.onload = function() {
+        canvas.width = img.width;
+        canvas.height = img.height;
+        ctx.drawImage(img, 0, 0);
+        
+        // Make sure we have valid point data before trying to draw
+        if (pointsData && pointsData.shapes) {
+            console.log("Drawing shapes:", pointsData.shapes.length); // Debug log
+            drawCanvas();
+        } else {
+            console.error("No valid shape data to draw");
+        }
+    };
+}
+            
+            function exitEditMode() {
+                editContainer.style.display = 'none';
+                pointsData = null;
+                selectedPoint = null;
+                selectedShape = null;
+                isAddingPoint = false;
+                isRemovingPoint = false;
+                addPointBtn.classList.remove('btn-success');
+                removePointBtn.classList.remove('btn-success');
+            }
+
+            
+// Fix for examine.html - Improve drawCanvas function
+
+function drawCanvas() {
+    // Clear canvas and draw frame
+    const img = new Image();
+    img.src = frameImg.src;
+    
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(img, 0, 0);
+    
+    // Draw shapes
+    if (pointsData && pointsData.shapes && pointsData.shapes.length > 0) {
+        console.log("Drawing shapes:", pointsData.shapes.length);
+        
+        pointsData.shapes.forEach((shape, shapeIndex) => {
+            const points = shape.points;
+            if (!points || points.length < 2) {
+                console.log("Skipping shape with insufficient points:", points);
+                return;
+            }
+            
+            // Draw connecting lines
+            ctx.beginPath();
+            ctx.moveTo(points[0][0], points[0][1]);
+            points.forEach(point => {
+                ctx.lineTo(point[0], point[1]);
+            });
+            ctx.closePath();
+            
+            // Set color based on selection
+            if (shapeIndex === selectedShape) {
+                ctx.strokeStyle = 'red';
+                ctx.lineWidth = 2;
+                // Add semi-transparent fill
+                ctx.fillStyle = 'rgba(255, 0, 0, 0.2)';
+                ctx.fill();
+            } else {
+                ctx.strokeStyle = 'blue';
+                ctx.lineWidth = 1;
+                // Add semi-transparent fill
+                ctx.fillStyle = 'rgba(0, 0, 255, 0.1)';
+                ctx.fill();
+            }
+            ctx.stroke();
+            
+            // Draw points
+            points.forEach((point, pointIndex) => {
+                ctx.beginPath();
+                if (shapeIndex === selectedShape && pointIndex === selectedPoint) {
+                    ctx.fillStyle = 'red';
+                    ctx.arc(point[0], point[1], 5, 0, Math.PI * 2);
+                } else {
+                    ctx.fillStyle = 'blue';
+                    ctx.arc(point[0], point[1], 3, 0, Math.PI * 2);
+                }
+                ctx.fill();
+            });
+        });
+    } else {
+        console.log("No shapes to draw");
+    }
+}
+
+// Add to examine.html - Function to create a new polygon
+
+// Add this new button to the edit controls
+// <button id="newShapeBtn" class="btn-info">New Shape</button>
+
+// Add this event listener in the DOMContentLoaded section
+newShapeBtn.addEventListener('click', () => {
+    createNewShape();
+});
+
+function createNewShape() {
+    if (!pointsData) {
+        pointsData = { "shapes": [] };
+    }
+    
+    // Create a new polygon with default points
+    const centerX = canvas.width / 2;
+    const centerY = canvas.height / 2;
+    const radius = Math.min(canvas.width, canvas.height) / 4;
+    
+    // Create a simple rectangle to start
+    const newShape = {
+        "label": "polygon",
+        "group_id": pointsData.shapes.length + 1,
+        "points": [
+            [centerX - radius, centerY - radius],
+            [centerX + radius, centerY - radius],
+            [centerX + radius, centerY + radius],
+            [centerX - radius, centerY + radius]
+        ]
+    };
+    
+    pointsData.shapes.push(newShape);
+    selectedShape = pointsData.shapes.length - 1;
+    selectedPoint = null;
+    
+    drawCanvas();
+}
+            
+            function selectPoint(x, y) {
+                if (!pointsData || !pointsData.shapes) return;
+                
+                selectedPoint = null;
+                selectedShape = null;
+                
+                // First try to select a point
+                let minDist = Infinity;
+                pointsData.shapes.forEach((shape, shapeIndex) => {
+                    shape.points.forEach((point, pointIndex) => {
+                        const dx = point[0] - x;
+                        const dy = point[1] - y;
+                        const dist = Math.sqrt(dx * dx + dy * dy);
+                        
+                        if (dist < 10 && dist < minDist) {
+                            minDist = dist;
+                            selectedPoint = pointIndex;
+                            selectedShape = shapeIndex;
+                        }
+                    });
+                });
+                
+                // If no point was selected, try to select a shape
+                if (selectedPoint === null) {
+                    pointsData.shapes.forEach((shape, shapeIndex) => {
+                        if (isPointInShape(x, y, shape.points)) {
+                            selectedShape = shapeIndex;
+                        }
+                    });
+                }
+                
+                drawCanvas();
+            }
+            
+            function isPointInShape(x, y, points) {
+                let inside = false;
+                for (let i = 0, j = points.length - 1; i < points.length; j = i++) {
+                    const xi = points[i][0], yi = points[i][1];
+                    const xj = points[j][0], yj = points[j][1];
+                    
+                    const intersect = ((yi > y) !== (yj > y)) && 
+                        (x < (xj - xi) * (y - yi) / (yj - yi) + xi);
+                    if (intersect) inside = !inside;
+                }
+                return inside;
+            }
+            
+            function addPoint(x, y) {
+                if (selectedShape === null || !pointsData || !pointsData.shapes) return;
+                
+                const shape = pointsData.shapes[selectedShape];
+                const points = shape.points;
+                
+                // Find best position to insert the new point
+                if (points.length < 2) {
+                    // If less than 2 points, just add it
+                    points.push([Math.round(x), Math.round(y)]);
+                } else {
+                    let bestPos = 0;
+                    let minDist = Infinity;
+                    
+                    // Find closest edge to insert the point
+                    for (let i = 0; i < points.length; i++) {
+                        const j = (i + 1) % points.length;
+                        const x1 = points[i][0], y1 = points[i][1];
+                        const x2 = points[j][0], y2 = points[j][1];
+                        
+                        // Distance from point to line segment
+                        const dist = distanceToLineSegment(x, y, x1, y1, x2, y2);
+                        
+                        if (dist < minDist) {
+                            minDist = dist;
+                            bestPos = j;
+                        }
+                    }
+                    
+                    // Insert at best position
+                    points.splice(bestPos, 0, [Math.round(x), Math.round(y)]);
+                }
+                
+                drawCanvas();
+            }
+            
+            function distanceToLineSegment(x, y, x1, y1, x2, y2) {
+                const A = x - x1;
+                const B = y - y1;
+                const C = x2 - x1;
+                const D = y2 - y1;
+                
+                const dot = A * C + B * D;
+                const len_sq = C * C + D * D;
+                let param = -1;
+                
+                if (len_sq !== 0) param = dot / len_sq;
+                
+                let xx, yy;
+                
+                if (param < 0) {
+                    xx = x1;
+                    yy = y1;
+                } else if (param > 1) {
+                    xx = x2;
+                    yy = y2;
+                } else {
+                    xx = x1 + param * C;
+                    yy = y1 + param * D;
+                }
+                
+                const dx = x - xx;
+                const dy = y - yy;
+                return Math.sqrt(dx * dx + dy * dy);
+            }
+            
+            function removePoint(x, y) {
+                if (!pointsData || !pointsData.shapes) return;
+                
+                // Find the closest point to remove
+                let closestDist = Infinity;
+                let pointToRemove = null;
+                let shapeToUpdate = null;
+                
+                pointsData.shapes.forEach((shape, shapeIndex) => {
+                    if (shape.points.length <= 3) return; // Don't remove if only 3 points
+                    
+                    shape.points.forEach((point, pointIndex) => {
+                        const dx = point[0] - x;
+                        const dy = point[1] - y;
+                        const dist = Math.sqrt(dx * dx + dy * dy);
+                        
+                        if (dist < 10 && dist < closestDist) {
+                            closestDist = dist;
+                            pointToRemove = pointIndex;
+                            shapeToUpdate = shapeIndex;
+                        }
+                    });
+                });
+                
+                if (pointToRemove !== null) {
+                    pointsData.shapes[shapeToUpdate].points.splice(pointToRemove, 1);
+                    drawCanvas();
+                }
+            }
+            
+// Modification for examine.html
+// Update the saveEditedMask function to reload the mask after saving
+
+function saveEditedMask() {
+    if (!pointsData) return;
+    
+    // Show loading spinner while saving
+    loadingSpinner.style.display = 'flex';
+    maskImg.style.display = 'none';
+    
+    fetch('/save_edited_mask', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            frame_num: currentFrame,
+            points_data: pointsData
+        }),
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert('Mask saved successfully!');
+            exitEditMode();
+            
+            // Force reload of the mask image by using timestamp
+            const timestamp = Date.now();
+            fetch(`/infer_frame/${currentFrame}?t=${timestamp}`)
+                .then(response => {
+                    if (!response.ok) throw new Error('Failed to load updated mask');
+                    return response.blob();
+                })
+                .then(blob => {
+                    const url = URL.createObjectURL(blob);
+                    maskImg.onload = function() {
+                        loadingSpinner.style.display = 'none';
+                        maskImg.style.display = 'block';
+                    };
+                    maskImg.src = url;
+                });
+        } else {
+            loadingSpinner.style.display = 'none';
+            maskImg.style.display = 'block';
+            alert('Error: ' + (data.error || 'Failed to save mask'));
+        }
+    })
+    .catch(error => {
+        console.error('Error saving mask:', error);
+        loadingSpinner.style.display = 'none';
+        maskImg.style.display = 'block';
+        alert('Failed to save mask');
+    });
+}
+        });
+    </script>
+</body>
+</html>

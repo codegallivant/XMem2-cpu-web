@@ -46,6 +46,7 @@
         }
         .upload-btn { background-color: #007bff; color: white; }
         .infer-btn { background-color: #28a745; color: white; }
+        .examine-btn { background-color: #6610f2; color: white; }
         .download-btn { background-color: #ffc107; color: black; }
     </style>
 </head>
@@ -70,11 +71,16 @@
         </form>
 
         <button id="inferBtn" class="infer-btn">Run Inference</button>
+        <a href="/examine" class="examine-btn" style="display: inline-block; text-decoration: none; padding: 10px; margin: 10px;">Examine Video</a>
         <a id="downloadLink" style="display: none;" class="download-btn">Download Processed Video</a>
     </div>
 
     <script>
         document.getElementById("inferBtn").addEventListener("click", function () {
+            let inferBtn = document.getElementById("inferBtn");
+            inferBtn.innerText = "Loading...";
+            inferBtn.disabled = true;
+
             fetch("/inference")
                 .then(response => {
                     if (!response.ok) {
@@ -87,11 +93,15 @@
                     let a = document.getElementById("downloadLink");
                     a.href = url;
                     a.style.display = "inline-block";
-                    a.download = "output.mp4";
-                    a.innerText = "Download Processed Video";
+                    a.download = "output.zip";
+                    a.innerText = "Download ZIP";
                 })
                 .catch(error => {
                     alert("Error: " + error.message);
+                })
+                .finally(() => {
+                    inferBtn.innerText = "Run Inference";
+                    inferBtn.disabled = false;
                 });
         });
     </script>
